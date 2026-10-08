@@ -79,7 +79,8 @@ REST_FRAMEWORK = {
 # Allow every origin in development. In production list the frontend's URL in
 # CORS_ALLOWED_ORIGINS (comma separated, e.g. https://gamers-assemble.netlify.app).
 CORS_ALLOW_ALL_ORIGINS = DEBUG
-CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS')
+# Trailing slashes are stripped because corsheaders rejects origins with a path.
+CORS_ALLOWED_ORIGINS = [origin.rstrip('/') for origin in env_list('CORS_ALLOWED_ORIGINS')]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
