@@ -50,7 +50,6 @@ class RemoveMember(APIView):
                 detail="Can not find a member with that primary key")
 
     def delete(self, request, group_pk, member_pk=None):
-        permission_classes = (IsAuthenticated,)
         if member_pk:
             member_to_remove = self.get_member(
                 group_pk=group_pk, member_pk=member_pk)

@@ -1,0 +1,30 @@
+# Render Blueprint: New + > Blueprint, pick this repo, and Render creates both
+# the web service and the Postgres database below.
+services:
+  - type: web
+    name: gamers-assemble-api
+    runtime: python
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: gunicorn project.wsgi
+    healthCheckPath: /api/games/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gamers-assemble-db
+          property: connectionString
+      # Set these two in the Render dashboard (they depend on your URLs):
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: LOAD_SEEDS
+        value: "true"
+
+databases:
+  - name: gamers-assemble-db
+    plan: free

@@ -34,11 +34,16 @@ class UserSerializer(serializers.ModelSerializer):
             if password != password_confirmation:
                 raise serializers.ValidationError(
                     {'password_confirmation': 'Passwords do not match'})
-            password_validation.validate_password(password)
+            try:
+                password_validation.validate_password(password)
+            except ValidationError as err:
+                # Django's ValidationError would surface as a 500; report it as a field error.
+                raise serializers.ValidationError({'password': list(err.messages)})
             data['password'] = make_password(password)
         return data
 
     class Meta:
         model = User
         fields = ('id', 'email', 'description', 'profile_image',
-                  'username', 'password', 'password_confirmation', 'date_joined')
+                  'username', 'discord_username', 'password', 'password_confirmation',
+                  'date_joined')

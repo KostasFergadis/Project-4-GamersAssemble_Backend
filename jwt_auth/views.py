@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import jwt
@@ -53,14 +53,19 @@ class LoginView(APIView):
         if not user_to_login.check_password(password):
             raise PermissionDenied(detail="Invalid Credentials")
 
-        dt = datetime.now() + timedelta(days=7)
-        token = jwt.encode({'sub': user_to_login.id, 'exp': int(
-            dt.strftime('%s'))}, settings.SECRET_KEY, algorithm='HS256')
+        expires = datetime.now(timezone.utc) + timedelta(days=7)
+        # 'sub' is a string because newer PyJWT versions reject integer subjects.
+        token = jwt.encode(
+            {'sub': str(user_to_login.id), 'exp': expires},
+            settings.SECRET_KEY,
+            algorithm='HS256',
+        )
 
         return Response({'token': token, 'message': f"Welcome back {user_to_login.username}"})
 
 
 class UserListView(APIView):
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
 
@@ -102,10 +107,10 @@ class UserDetailListView(APIView):
         return Response(user_data, status=status.HTTP_200_OK)
 
     def put(self, request, pk=None):
-        if pk is not None:
-            user = self.get_user(pk)
-        else:
-            user = request.user
+        # Users may only edit their own profile.
+        if pk is not None and pk != request.user.id:
+            raise PermissionDenied(detail='You can only edit your own profile.')
+        user = request.user
 
         new_username = request.data.get('username')
         if new_username is not None:
@@ -134,9 +139,7 @@ class UserDetailListView(APIView):
             # Update the user's Discord username
             user.discord_username = new_discord_username
 
-    # Save the updated user object
         user.save()
 
-    # Serialize the updated user object and return the response
         serializer = PopulatedUserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)

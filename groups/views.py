@@ -1,17 +1,19 @@
-from .models import Group
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import NotFound
-from django.db import IntegrityError
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from games.models import Game
+from .models import Group
 from .serializers.common import GroupSerializer
 from .serializers.populated import PopulatedGroupSerializer
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework.permissions import IsAuthenticated
-from games.models import Game
-from members.models import Member
-from rest_framework.exceptions import ValidationError
-# Create your views here.
+
+
+def flatten_errors(errors):
+    """Turn DRF's {field: [messages]} into one readable string for the frontend."""
+    return ' '.join(
+        f'{field}: {message}' for field, messages in errors.items() for message in messages)
 
 
 class GroupListView(APIView):
@@ -23,82 +25,63 @@ class GroupListView(APIView):
         return Response(serialized_groups.data, status=status.HTTP_200_OK)
 
     def post(self, request):
-        if not request.user:
-            return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        game_title = request.data.get('title', None)
-        game = Game.objects.get(title=game_title)
-        request.data['game'] = game.id
-        request.data["owner"] = request.user.id
-        request.data["members"] = []
-        group_to_add = GroupSerializer(data=request.data)
-
+        # The frontend identifies the game by its title.
         try:
-            group_to_add.is_valid()
-            group_to_add.save()
-            return Response(group_to_add.data, status=status.HTTP_201_CREATED)
+            game = Game.objects.get(title=request.data.get('title'))
+        except Game.DoesNotExist:
+            return Response({'error': 'Please select a game for the group.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        except IntegrityError as e:
-            res = {
-                "detail": str(e)
-            }
-            return Response(res, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        group_to_add = GroupSerializer(data={
+            'name': request.data.get('name'),
+            'description': request.data.get('description'),
+            'game': game.id,
+            'owner': request.user.id,
+        })
+        if not group_to_add.is_valid():
+            return Response({'error': flatten_errors(group_to_add.errors)},
+                            status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        except AssertionError as e:
-            return Response({"error": "A group with this title already exists"}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-
-        except:
-            return Response({"detail": "Unproccesible Entity"}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        group_to_add.save()
+        return Response(group_to_add.data, status=status.HTTP_201_CREATED)
 
 
 class GroupDetailView(APIView):
-    def get_group(self, _request, pk):
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+
+    def get_group(self, pk):
         try:
             return Group.objects.get(pk=pk)
         except Group.DoesNotExist:
-            raise NotFound(
-                detail="Can not find a group with that primary key")
+            raise NotFound(detail='Can not find a group with that primary key')
 
-    def get(self, request, pk):  # Add the request argument
-        group = self.get_group(request, pk=pk)
-        serialized_group = PopulatedGroupSerializer(group)
-        return Response(serialized_group.data, status=status.HTTP_200_OK)
+    def get(self, _request, pk):
+        group = self.get_group(pk)
+        return Response(PopulatedGroupSerializer(group).data, status=status.HTTP_200_OK)
 
     def put(self, request, pk):
-        group_to_edit = self.get_group(request, pk=pk)
-
-        # Only update owner field if present in request body
-        if 'owner' in request.data:
-            request.data['owner'] = request.user.id
-
+        group_to_edit = self.get_group(pk)
         if request.user != group_to_edit.owner:
-            return Response({"detail": "Only the owner of the group can update it."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Only the owner of the group can update it.'},
+                            status=status.HTTP_403_FORBIDDEN)
 
-        # Check if group with new title already exists
-        new_title = request.data.get('title')
-        if new_title and Group.objects.exclude(pk=group_to_edit.pk).filter(title=new_title).exists():
-            return Response({"error": "A group with this title already exists."}, status=status.HTTP_400_BAD_REQUEST)
+        # Only the name and description can be edited; ownership, game, members and
+        # the like counters are managed elsewhere.
+        data = {key: request.data[key]
+                for key in ('name', 'description') if key in request.data}
+        updated_group = GroupSerializer(group_to_edit, data=data, partial=True)
+        if not updated_group.is_valid():
+            return Response({'error': flatten_errors(updated_group.errors)},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        request.data["members"] = group_to_edit.members.all(
-        ).values_list('id', flat=True)
-        updated_group = GroupSerializer(
-            group_to_edit, data=request.data, partial=True)
-
-        try:
-            updated_group.is_valid(raise_exception=True)
-            updated_group.save()
-            return Response(updated_group.data, status=status.HTTP_202_ACCEPTED)
-        except ValidationError as e:
-            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-        except:
-            return Response({"detail": "Unprocessable Entity"}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        updated_group.save()
+        return Response(updated_group.data, status=status.HTTP_202_ACCEPTED)
 
     def delete(self, request, pk):
-        group_to_delete = self.get_group(request, pk=pk)
+        group_to_delete = self.get_group(pk)
+        if request.user != group_to_delete.owner:
+            return Response({'error': 'Only the owner of the group can delete it.'},
+                            status=status.HTTP_403_FORBIDDEN)
 
-        # check if the current user is the owner of the group
-        if request.user == group_to_delete.owner:
-            group_to_delete.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        else:
-            return Response({"detail": "Only the owner of the group can delete it."}, status=status.HTTP_403_FORBIDDEN)
+        group_to_delete.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

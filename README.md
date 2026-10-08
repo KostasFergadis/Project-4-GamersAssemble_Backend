@@ -2,13 +2,31 @@
 
 `Explore a wide variety of games, join an existing group or create your own. Chat with other members and provide feedback by rating the group. Personalize your profile and browse other users' profiles.`
 
-The backend is connected to a Heroku database so setting it up locally is not required.
-This is what you would have to do if, however, you wanted to set it up locally:
+## Running locally
 
-1. Clone the backend repo
-2. Open the project and open a shell in the terminal using pipenv shell
-3. Run pipenv install to install the projects dependencies
-4. Run python manage.py runserver to start the server locally
+```
+pipenv install            # or: pip install -r requirements.txt
+python manage.py migrate
+python manage.py loaddata jwt_auth/seeds.json genres/seeds.json games/seeds.json groups/seeds.json members/seeds.json ratings/seeds.json groupchat/seeds.json
+python manage.py runserver
+python manage.py test     # API tests
+```
+
+Without any environment variables the app uses a local SQLite file and development settings. Point the frontend at it with `VITE_API_URL=http://127.0.0.1:8000/api`.
+
+## Deploying (Render)
+
+The Heroku free tier no longer exists, so the repo ships a Render Blueprint (`render.yaml`):
+
+1. Push this repo to GitHub.
+2. In Render choose **New + > Blueprint** and select the repo. It creates the web service and a Postgres database, generates `SECRET_KEY` and wires up `DATABASE_URL`.
+3. When asked, set `CORS_ALLOWED_ORIGINS` to your frontend's URL (e.g. `https://gamers-assemble.netlify.app`, no trailing slash).
+4. The first deploy loads the demo data because `LOAD_SEEDS=true`. Remove that variable afterwards if you like.
+5. In the frontend host (Netlify) set `VITE_API_URL=https://<your-service>.onrender.com/api` and redeploy.
+
+Notes: free web services sleep after inactivity (the first request can take ~30-60 s), and free Render Postgres databases expire after 30 days unless upgraded.
+
+Environment variables: `SECRET_KEY`, `DEBUG`, `DATABASE_URL`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `LOAD_SEEDS`.
 
 ## Table of Contents:
 
@@ -45,7 +63,7 @@ As most actions are locked before authentication registration would be required,
 - Error handling included for various actions performed
 - Backend API built with Python Django
 - Frontend built with React
-- Database using Heroku to deploy
+- PostgreSQL database (deployed on Render via `render.yaml`)
 
 ## The Brief
 
@@ -64,7 +82,7 @@ As most actions are locked before authentication registration would be required,
 - PyJWT: a Python library used for JSON Web Token (JWT) authentication.
 - psycopg2-binary: a PostgreSQL adapter for Python used for connecting Django with PostgreSQL database.
 - django-cors-headers: a Django library used for handling Cross-Origin Resource Sharing (CORS) headers.
-- django-on-heroku==1.1.2 (library for deploying Django projects on Heroku)
+- gunicorn, whitenoise and dj-database-url (production server, static files and `DATABASE_URL` support for hosting on Render)
 - django-rest-framework: a powerful and flexible toolkit for building Web APIs with Django.
 
 ### Frontend:

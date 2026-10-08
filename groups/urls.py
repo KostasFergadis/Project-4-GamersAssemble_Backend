@@ -7,7 +7,6 @@ from ratings.views import Like, Dislike
 
 urlpatterns = [
     path('', GroupListView.as_view()),
-    path('', GroupDetailView.as_view()),
     path('<int:pk>/', GroupDetailView.as_view()),
     path('<int:pk>/join/', RequestMembership.as_view()),
     path('<int:pk>/groupchat/', GroupChatList.as_view()),

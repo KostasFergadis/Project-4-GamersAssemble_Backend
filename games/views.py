@@ -7,20 +7,38 @@ from .serializers.common import GameSerializer
 from rest_framework.exceptions import NotFound
 from django.db import IntegrityError
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import BasePermission, SAFE_METHODS
+
+GAMES_PER_PAGE = 9
+
+
+class IsAdminOrReadOnly(BasePermission):
+    """Anyone can read games; only staff can create, edit or delete them."""
+
+    def has_permission(self, request, view):
+        return request.method in SAFE_METHODS or bool(
+            request.user and request.user.is_staff)
 
 
 class GameListView(APIView):
+    permission_classes = (IsAdminOrReadOnly,)
+
     def get(self, request):
-        page = request.GET.get('page')
-        if page:
-            games = Game.objects.all()
+        games = Game.objects.all().order_by('id')
+        # ?search=zel filters by title (case-insensitive).
+        search = request.GET.get('search', '').strip()
+        if search:
+            games = games.filter(title__icontains=search)
+
+        # With ?page=N the response is paginated ({count, next, previous, results});
+        # without it the full list is returned (used by the group creation form).
+        if request.GET.get('page'):
             paginator = PageNumberPagination()
-            paginator.page_size = 9  # number of games per page
+            paginator.page_size = GAMES_PER_PAGE
             result_page = paginator.paginate_queryset(games, request)
             serialized_products = GameSerializer(result_page, many=True)
             return paginator.get_paginated_response(serialized_products.data)
         else:
-            games = Game.objects.all()
             serialized_products = GameSerializer(games, many=True)
             return Response(serialized_products.data, status=status.HTTP_200_OK)
 
@@ -45,6 +63,7 @@ class GameListView(APIView):
 
 
 class GameDetailView(APIView):
+    permission_classes = (IsAdminOrReadOnly,)
 
     def get_game(self, _request, pk):
         try:

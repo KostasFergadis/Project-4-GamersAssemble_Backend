@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from groups.models import Group
 from rest_framework.exceptions import NotFound
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.permissions import IsAuthenticated
 from .serializers.common import GroupChatSerializer
@@ -33,8 +33,14 @@ class GroupChatList(APIView):
 
     def post(self, request, pk):
         group = self.get_group(pk=pk)
-        message_text = request.data.get('message_text')
+        message_text = (request.data.get('message_text') or '').strip()
         created_by_user = request.user
+
+        if not message_text:
+            raise ValidationError({'message_text': 'A message cannot be empty.'})
+        if len(message_text) > 200:
+            raise ValidationError(
+                {'message_text': 'A message can be at most 200 characters long.'})
 
         if not group.members.filter(user=request.user).exists() and group.owner != request.user:
             raise PermissionDenied("You are not a member of this group.")
