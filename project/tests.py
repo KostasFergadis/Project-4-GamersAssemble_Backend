@@ -99,21 +99,42 @@ class RatingTests(ApiTestCase):
         self.group.refresh_from_db()
         return self.group.likes, self.group.dislikes
 
-    def test_like_is_idempotent_and_switching_moves_the_vote(self):
+    def join(self, email):
+        self.login(email)
+        self.client.post(f'/api/groups/{self.group.id}/join/')
+
+    def test_non_members_cannot_rate(self):
         self.login('other@test.com')
+        res = self.client.post(f'/api/groups/{self.group.id}/like/')
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(self.counts(), (0, 0))
+
+    def test_same_vote_toggles_and_other_vote_switches(self):
+        self.join('other@test.com')
         url = f'/api/groups/{self.group.id}'
-        self.client.post(f'{url}/like/')
-        self.client.post(f'{url}/like/')
+        res = self.client.post(f'{url}/like/')
+        self.assertEqual(res.data['user_rating'], 'like')
         self.assertEqual(self.counts(), (1, 0))
-        self.client.post(f'{url}/dislike/')
-        self.assertEqual(self.counts(), (0, 1))
-        self.client.post(f'{url}/dislike/')
-        self.assertEqual(self.counts(), (0, 1))
+        res = self.client.post(f'{url}/like/')  # toggles off
+        self.assertEqual(res.data['user_rating'], None)
+        self.assertEqual(self.counts(), (0, 0))
         self.client.post(f'{url}/like/')
-        self.assertEqual(self.counts(), (1, 0))
+        res = self.client.post(f'{url}/dislike/')  # switches
+        self.assertEqual(res.data['user_rating'], 'dislike')
+        self.assertEqual(self.counts(), (0, 1))
+
+    def test_group_detail_reports_my_rating(self):
+        self.join('other@test.com')
+        self.client.post(f'/api/groups/{self.group.id}/like/')
+        res = self.client.get(f'/api/groups/{self.group.id}/')
+        self.assertEqual(res.data['user_rating'], 'like')
+        self.assertEqual(res.data['game_id'], self.game.id)
+        self.client.credentials()  # anonymous
+        res = self.client.get(f'/api/groups/{self.group.id}/')
+        self.assertIsNone(res.data['user_rating'])
 
     def test_votes_from_different_users_add_up(self):
         for email in ('owner@test.com', 'other@test.com'):
-            self.login(email)
+            self.join(email)
             self.client.post(f'/api/groups/{self.group.id}/like/')
         self.assertEqual(self.counts(), (2, 0))

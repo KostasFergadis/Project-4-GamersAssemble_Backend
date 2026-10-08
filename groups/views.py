@@ -55,9 +55,10 @@ class GroupDetailView(APIView):
         except Group.DoesNotExist:
             raise NotFound(detail='Can not find a group with that primary key')
 
-    def get(self, _request, pk):
+    def get(self, request, pk):
         group = self.get_group(pk)
-        return Response(PopulatedGroupSerializer(group).data, status=status.HTTP_200_OK)
+        serialized_group = PopulatedGroupSerializer(group, context={'request': request})
+        return Response(serialized_group.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk):
         group_to_edit = self.get_group(pk)
