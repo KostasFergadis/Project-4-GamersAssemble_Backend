@@ -40,6 +40,7 @@ Environment variables: `SECRET_KEY`, `DEBUG`, `DATABASE_URL`, `ALLOWED_HOSTS`, `
 8.  Future Content and Improvements
 9.  Key Learnings
 10. Credits
+11. Original version (2023)
 
 ## Project Overview
 
@@ -51,7 +52,23 @@ As most actions are locked before authentication registration would be required,
 
 ![Alt text](https://i.imgur.com/RE50Eee.png "Optional title")
 
+> **Update (October 2026):** the app has been revisited since the original 17-day build. The UI was redesigned (new header, footer, browse, game, group and profile pages, mobile layout), bugs and security issues were fixed, and the project now deploys to Render instead of Heroku. Screenshots in the "Final project" section show the current UI; the original 2023 version is kept below under "Original version (2023)".
+
 ## Features
+
+- REST API built with Django and Django REST Framework, JWT authentication with a custom user model
+- Games list with title search (`GET /api/games/?search=`) and pagination (`?page=N`, 9 per page)
+- Groups per game: create, edit and delete (owner only), join, leave and remove members
+- Group chat with message length validation
+- Like/dislike voting for group members only. Voting the same way twice removes the vote and voting the other way switches it. The group detail returns `game_id` and the caller's own `user_rating`
+- User profiles with avatar, bio and Discord username. Only the owner can edit their profile and the user list requires login
+- Only staff can create, edit or delete games
+- API tests (`python manage.py test`) covering auth, games, groups and ratings
+- PostgreSQL in production, SQLite locally, deployable on Render via `render.yaml`
+- Frontend (React) lives in the separate `Project-4-GamersAssemble_Frontend` repo
+
+<details>
+<summary>Original features (2023)</summary>
 
 - Home page displaying a quote for games and a button to go to the browse games page
 - Register and login page for user authentication
@@ -64,6 +81,8 @@ As most actions are locked before authentication registration would be required,
 - Backend API built with Python Django
 - Frontend built with React
 - PostgreSQL database (deployed on Render via `render.yaml`)
+
+</details>
 
 ## The Brief
 
@@ -235,31 +254,65 @@ On the last day, I allocated some time to address some of the remaining bugs and
 
 ## Final project:
 
+Current UI (redesigned in 2026).
+
 #### Homepage:
 
-![Alt text](https://i.imgur.com/S7FzKWl.png "Optional title")
+![Homepage](screenshots/home.png)
 
 #### Browse games page:
 
-![Alt text](https://i.imgur.com/SHhkRB2.png "Optional title")
+![Browse games page](screenshots/browse.png)
 
 #### Game page:
 
-![Alt text](https://i.imgur.com/pChWUss.png "Optional title")
+![Game page](screenshots/game.png)
 
 #### Group page:
 
-![Alt text](https://i.imgur.com/of13eYD.png "Optional title")
+![Group page](screenshots/group.png)
 
 #### User's page:
 
-![Alt text](https://i.imgur.com/vbYVD38.png "Optional title")
+![User's page](screenshots/user.png)
 
 #### Register page:
 
-![Alt text](https://i.imgur.com/XfQdZNb.png "Optional title")
+![Register page](screenshots/register.png)
 
 #### Login page:
+
+![Login page](screenshots/login.png)
+
+## Original version (2023)
+
+The screenshots below show the original UI as submitted at the end of the course, before the redesign.
+
+##### Homepage:
+
+![Alt text](https://i.imgur.com/S7FzKWl.png "Optional title")
+
+##### Browse games page:
+
+![Alt text](https://i.imgur.com/SHhkRB2.png "Optional title")
+
+##### Game page:
+
+![Alt text](https://i.imgur.com/pChWUss.png "Optional title")
+
+##### Group page:
+
+![Alt text](https://i.imgur.com/of13eYD.png "Optional title")
+
+##### User's page:
+
+![Alt text](https://i.imgur.com/vbYVD38.png "Optional title")
+
+##### Register page:
+
+![Alt text](https://i.imgur.com/XfQdZNb.png "Optional title")
+
+##### Login page:
 
 ![Alt text](https://i.imgur.com/eXlNJYM.png "Optional title")
 
@@ -276,6 +329,8 @@ During the project, I encountered various challenges, including resolving persis
 ## Bugs
 
 There are occasional internal server errors when refreshing or navigating pages, specifically on the user page. The issue appears to stem from attempting to retrieve both the currently logged-in user's data and another user's ID data when clicking on a username link in the navbar, footer, or on another user's profile page. This conflict may cause the page to break and malfunction, but a refresh usually resolves the issue. One potential solution is to selectively render a user's information based on whether they are the logged-in user or another user. Additionally, it may be helpful to review the code and ensure that any incorrect logic is corrected.
+
+**Update (2026):** the user page `/users/undefined` bug described above has been fixed; the page now loads the logged-in user correctly and errors no longer crash it when the server is unreachable.
 
 ## Future Content and Improvements
 
